@@ -1,0 +1,62 @@
+# ============================================================================
+#  上位机 <-> STM32 主控 串口通信 端口声明表（全队唯一要改的配置文件）
+#
+#  加一个发送端口 = 写一个 .msg + 在 tx 里加一段；
+#  加一个接收端口 = 在 rx 里加一段。
+#
+#  字段顺序由 .msg 决定（= 协议 payload 顺序），不要在这里写字段。
+#  不要改 engine.py / packet.py / communicate_node.py。
+#
+#  字段说明：
+#    port       协议端口号（TX/RX 两套编号，见《上位机与主控通讯协议》）
+#    topic      ROS2 话题名
+#    type       ROS2 消息类型串（pkg/msg/Type）
+#    ptype      1 = 无确认（主用）；0 = 可靠（要 ACK，重传暂未实现）
+#    level      默认 3；qos 队列深度，默认 10
+#    idle_check true = 动作端口，发前自动查 master_fsm_state == MS_IDLE（P5~P8 用）
+#    dangerous  true = 高危端口，默认不装配，要显式 -p allow_dangerous:=true（P11 用）
+# ============================================================================
+
+serial:
+  device: /dev/ttyUSB0     # 串口设备；建议 udev 规则固定成别名，避免 ttyUSB* 漂移
+  baudrate: 115200
+  poll_period: 0.01        # 串口轮询周期（秒）
+  diagnostics_period: 5.0  # 诊断日志周期（秒）：校验失败/重同步/断流告警
+  stale_timeout: 2.0       # 超过这个秒数没收到主控数据就告警
+  reconnect_period: 1.0    # 串口打不开时的重连间隔（秒），避免刷屏
+
+# ---- 动作端口发前查空闲（对应协议第 9 节第 5 条）----
+# P5~P8 动作命令主控只有 MS_IDLE 才接受，忙时静默丢弃、不排队不回报。
+# idle_value = MS_IDLE 的枚举值，跟电控确认后填；null = 未确认，动作端口一律拒发。
+idle_check:
+  rx_port: 1               # 从哪个 RX 端口读状态（P1 综合状态）
+  field: master_fsm_state  # 哪个字段是顶层 FSM 状态
+  idle_value: null         # ★ MS_IDLE 枚举值，跟电控确认后填，例如 0
+
+# ---- 发往主控 TX ----
+tx:
+  - port: 2                # P2 定位误差 [error_x_m, error_y_m, error_theta_rad]
+    topic: robot/loc_error
+    type: robot_interfaces/msg/LocError
+
+  - port: 3                # P3 雷达位置 [x_m, y_m]
+    topic: robot/lidar_pos
+    type: robot_interfaces/msg/LidarPos
+
+  # P5~P8 动作端口模板（等 MS_IDLE 确认后按此加，会自动查空闲）：
+  # - port: 5
+  #   topic: robot/chassis_action
+  #   type: robot_interfaces/msg/ChassisAction
+  #   idle_check: true
+
+  # P11 复位全部 FSM（高风险，默认不装配）：
+  # - port: 11
+  #   topic: robot/reset_fsm
+  #   type: robot_interfaces/msg/ResetFsm
+  #   dangerous: true     # 需 ros2 run ... -p allow_dangerous:=true 才生效
+
+# ---- 主控上报 RX ----
+rx:
+  - port: 1                # P1 综合状态（12 个 float，~20Hz）
+    topic: robot/status
+    type: robot_interfaces/msg/RobotStatus

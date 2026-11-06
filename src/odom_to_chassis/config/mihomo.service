@@ -1,0 +1,7 @@
+[Unit]
+Description=Mihomo Core
+[Service]
+Type=exec
+ExecStart=/home/brt/.proxy.bash
+[Install]
+WantedBy=multi-user.target

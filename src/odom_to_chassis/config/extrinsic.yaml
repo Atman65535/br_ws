@@ -1,0 +1,9 @@
+/odom_to_chassis_node:
+    ros__parameters:
+        # degree here. Right hand side.
+        yaw: 180.0
+        pitch: 0.0
+        roll: 0.0
+        x: -0.2705
+        y: 0.0
+        z: 0.555
